@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
+
       - run: npm install
       - run: npm test
 
@@ -46,5 +48,7 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker tag nodejs-app:${{ github.sha }} sushmita0408/nodejs-app:${{ github.sha }}
-          docker push sushmita0408/nodejs-app:${{ github.sha }}
+          docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
+          docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
