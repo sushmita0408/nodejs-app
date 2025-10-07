@@ -52,3 +52,4 @@ jobs:
           docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
+          
