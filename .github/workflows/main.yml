@@ -68,7 +68,8 @@ jobs:
           GIT_USER_EMAIL: ci-bot@example.com
         run: |
           # Install yq
-          sudo apt-get update && sudo apt-get install -y yq git
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
 
           # Clone devops repo
           git clone $DEVOPS_REPO devops
