@@ -25,11 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1. Build Docker image
       - name: Build Docker image
         run: docker build -t nodejs-app:${{ github.sha }} .
 
-      # 2. Install Trivy
       - name: Install Trivy
         run: |
           sudo apt-get update -y
@@ -39,18 +37,15 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install trivy -y
 
-      # 3. Scan Docker image
       - name: Scan Docker image
         run: trivy image nodejs-app:${{ github.sha }}
 
-      # 4. Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 5. Push Docker image
       - name: Push Docker image
         run: |
           docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
@@ -58,31 +53,33 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
 
-      # 6. Update devops repo values.yaml for Argo CD
-      - name: Update devops values.yaml
+      - name: Install yq v4
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update values.yaml and push
         env:
-          DEVOPS_REPO: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/sushmita0408/devops.git
+          DEVOPS_REPO: https://github.com/sushmita0408/devops.git
           IMAGE_TAG: ${{ github.sha }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           GIT_USER_NAME: ci-bot
           GIT_USER_EMAIL: ci-bot@example.com
+          GIT_PAT: ${{ secrets.GIT_PAT }}
         run: |
-          # Install yq
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-          sudo chmod +x /usr/local/bin/yq
-
-          # Clone devops repo
-          git clone $DEVOPS_REPO devops
+          # Clone repo using PAT for authentication
+          git clone https://$GIT_PAT@github.com/sushmita0408/devops.git devops
           cd devops
 
-          # Configure git user
+          # Configure git
           git config user.email "$GIT_USER_EMAIL"
           git config user.name "$GIT_USER_NAME"
 
-          # Update values.yaml
-          yq eval ".image.repository = \"$DOCKER_USERNAME/nodejs-app\" | .image.tag = \"$IMAGE_TAG\"" -i values.yaml
+          # Update values.yaml using yq v4 syntax
+          yq eval ".image.repository = \"${DOCKER_USERNAME}/nodejs-app\" | .image.tag = \"${IMAGE_TAG}\"" -i values.yaml
 
-          # Commit and push
+          # Commit and push changes
           git add values.yaml
           git commit -m "ci: update image to $IMAGE_TAG"
           git push origin main
