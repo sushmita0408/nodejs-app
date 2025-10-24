@@ -25,9 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # 1. Build Docker image
       - name: Build Docker image
         run: docker build -t nodejs-app:${{ github.sha }} .
 
+      # 2. Install Trivy
       - name: Install Trivy
         run: |
           sudo apt-get update -y
@@ -37,19 +39,49 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install trivy -y
 
+      # 3. Scan Docker image
       - name: Scan Docker image
         run: trivy image nodejs-app:${{ github.sha }}
 
+      # 4. Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # 5. Push Docker image
       - name: Push Docker image
         run: |
           docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
           docker tag nodejs-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:${{ github.sha }}
           docker push ${{ secrets.DOCKER_USERNAME }}/nodejs-app:latest
-          
+
+      # 6. Update devops repo values.yaml for Argo CD
+      - name: Update devops values.yaml
+        env:
+          DEVOPS_REPO: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/sushmita0408/devops.git
+          IMAGE_TAG: ${{ github.sha }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          GIT_USER_NAME: ci-bot
+          GIT_USER_EMAIL: ci-bot@example.com
+        run: |
+          # Install yq
+          sudo apt-get update && sudo apt-get install -y yq git
+
+          # Clone devops repo
+          git clone $DEVOPS_REPO devops
+          cd devops
+
+          # Configure git user
+          git config user.email "$GIT_USER_EMAIL"
+          git config user.name "$GIT_USER_NAME"
+
+          # Update values.yaml
+          yq eval ".image.repository = \"$DOCKER_USERNAME/nodejs-app\" | .image.tag = \"$IMAGE_TAG\"" -i values.yaml
+
+          # Commit and push
+          git add values.yaml
+          git commit -m "ci: update image to $IMAGE_TAG"
+          git push origin main
